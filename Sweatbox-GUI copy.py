@@ -17,7 +17,7 @@ from json import load,dump
 
 script_dir=os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
-
+print(script_dir)
 
 class FlightPlanGenerator(QMainWindow):
     def __init__(self):
@@ -31,8 +31,8 @@ class FlightPlanGenerator(QMainWindow):
         
         
         
-        self.csv_path = "Your Route CSV Path"
-        self.gate_path="Your Gate json Path"
+        self.csv_path = "adf/RouteCheck.csv"
+        self.gate_path="adf/Gate.json"
         
         # 然后初始化UI
         self.initUI()
