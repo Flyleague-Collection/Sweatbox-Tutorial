@@ -1,0 +1,8 @@
+name: sweatbox-env
+dependencies:
+  - python=3.10
+  - pandas=2.3.3
+  - pyqt=5.15.11
+  - pip
+  - pip:
+      - PyQt5_sip==12.17.0
