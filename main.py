@@ -9,10 +9,10 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QSpinBox, QComboBox, QMessageBox, 
                              QGroupBox, QGridLayout, QTabWidget, QFileDialog,
                              QInputDialog)
-from PyQt5.QtCore import Qt
-from dataclasses import replace
+# from PyQt5.QtCore import Qt
+# from dataclasses import replace
 import json
-from json import load,dump
+# from json import load,dump
 
 
 script_dir=os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +33,7 @@ class FlightPlanGenerator(QMainWindow):
         
         self.csv_path = "adf/RouteCheck.csv"
         self.gate_path="adf/Gate.json"
-        
+
         # 然后初始化UI
         self.initUI()
         
