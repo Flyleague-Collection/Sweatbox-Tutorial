@@ -9,10 +9,12 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QSpinBox, QComboBox, QMessageBox, 
                              QGroupBox, QGridLayout, QTabWidget, QFileDialog,
                              QInputDialog)
-# from PyQt5.QtCore import Qt
-# from dataclasses import replace
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QPalette, QColor
+from dataclasses import replace
+
 import json
-# from json import load,dump
+from json import load,dump
 
 
 script_dir=os.path.dirname(os.path.abspath(__file__))
@@ -33,42 +35,138 @@ class FlightPlanGenerator(QMainWindow):
         
         self.csv_path = "adf/RouteCheck.csv"
         self.gate_path="adf/Gate.json"
-
+        
         # 然后初始化UI
         self.initUI()
         
     def initUI(self):
-        self.setWindowTitle('模拟机文本生成器')
-        self.setGeometry(100, 100, 800, 600)
+        self.setWindowTitle('模拟机文本生成器 v1.0')
+        self.setGeometry(100, 100, 900, 700)
+        
+        # 设置应用样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f0f0f0;
+            }
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #cccccc;
+                border-radius: 8px;
+                margin-top: 1ex;
+                padding-top: 10px;
+                background-color: white;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #2c3e50;
+            }
+            QPushButton {
+                background-color: #3498db;
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QPushButton:pressed {
+                background-color: #21618c;
+            }
+            QLineEdit, QComboBox, QSpinBox, QTextEdit {
+                padding: 6px;
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border-color: #3498db;
+            }
+            QTabWidget::pane {
+                border: 1px solid #bdc3c7;
+                background-color: white;
+            }
+            QTabBar::tab {
+                background-color: #ecf0f1;
+                border: 1px solid #bdc3c7;
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: #3498db;
+                color: white;
+            }
+            QLabel {
+                color: #2c3e50;
+            }
+        """)
         
         # 创建中心窗口和主布局
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # 创建标题
+        title_label = QLabel("模拟机文本生成器")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #2c3e50;
+                padding: 10px;
+                background-color: #3498db;
+                color: white;
+                border-radius: 5px;
+            }
+        """)
+        main_layout.addWidget(title_label)
         
         # 创建选项卡
         tabs = QTabWidget()
+        tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #bdc3c7;
+                border-radius: 5px;
+                background-color: white;
+            }
+        """)
         main_layout.addWidget(tabs)
         
         # 创建单个航班选项卡
         single_flight_tab = QWidget()
         single_layout = QVBoxLayout(single_flight_tab)
+        single_layout.setSpacing(15)
+        single_layout.setContentsMargins(15, 15, 15, 15)
         
-        #创建塔台航班选项卡
-        tower_flight_tab=QWidget()
-        tower_layout=QVBoxLayout(tower_flight_tab)
+        # 创建塔台航班选项卡
+        tower_flight_tab = QWidget()
+        tower_layout = QVBoxLayout(tower_flight_tab)
+        tower_layout.setSpacing(15)
+        tower_layout.setContentsMargins(15, 15, 15, 15)
         
         # 控制权设置
         control_group = QGroupBox("控制权设置")
         control_layout = QHBoxLayout(control_group)
         control_layout.addWidget(QLabel("控制权所有席位:"))
         self.ini_input = QLineEdit()
+        self.ini_input.setPlaceholderText("请输入控制权席位...")
         control_layout.addWidget(self.ini_input)
         single_layout.addWidget(control_group)
         
         # 航班信息
         flight_group = QGroupBox("航班信息")
         flight_layout = QGridLayout(flight_group)
+        flight_layout.setVerticalSpacing(10)
+        flight_layout.setHorizontalSpacing(15)
         
         flight_layout.addWidget(QLabel("DEP机场:"), 0, 0)
         self.dep_input = QComboBox()
@@ -99,43 +197,58 @@ class FlightPlanGenerator(QMainWindow):
         
         flight_layout.addWidget(QLabel("经纬度:"), 5, 0)
         self.pos_input = QLineEdit("N30.5,E120.5")
+        self.pos_input.setPlaceholderText("格式: N30.5,E120.5")
         flight_layout.addWidget(self.pos_input, 5, 1)
         
         flight_layout.addWidget(QLabel("头朝向:"), 6, 0)
+        head_layout = QHBoxLayout()
         self.head_input = QSpinBox()
         self.head_input.setRange(0, 360)
         self.head_input.setValue(0)
-        flight_layout.addWidget(self.head_input, 6, 1)
+        head_layout.addWidget(self.head_input)
+        head_layout.addStretch()
+        flight_layout.addLayout(head_layout, 6, 1)
         
         flight_layout.addWidget(QLabel("实际航路:"), 7, 0)
         self.rte_input = QLineEdit()
+        self.rte_input.setPlaceholderText("留空则使用数据库航路")
         flight_layout.addWidget(self.rte_input, 7, 1)
         
         single_layout.addWidget(flight_group)
         
-        # 按钮
-        button_layout = QHBoxLayout()
+        # 按钮区域
+        button_group = QGroupBox("操作")
+        button_layout = QHBoxLayout(button_group)
         self.generate_btn = QPushButton("生成飞行计划")
         self.generate_btn.clicked.connect(self.generate_single_flight)
+        self.generate_btn.setStyleSheet("QPushButton { background-color: #27ae60; } QPushButton:hover { background-color: #219653; }")
         button_layout.addWidget(self.generate_btn)
         
         self.save_btn = QPushButton("保存到文件")
         self.save_btn.clicked.connect(self.save_to_file)
+        self.save_btn.setStyleSheet("QPushButton { background-color: #e67e22; } QPushButton:hover { background-color: #d35400; }")
         button_layout.addWidget(self.save_btn)
         
-        single_layout.addLayout(button_layout)
+        single_layout.addWidget(button_group)
         
         # 输出区域
+        output_group = QGroupBox("输出")
+        output_layout = QVBoxLayout(output_group)
         self.output_text = QTextEdit()
-        single_layout.addWidget(QLabel("输出:"))
-        single_layout.addWidget(self.output_text)
+        self.output_text.setMinimumHeight(200)
+        output_layout.addWidget(self.output_text)
+        single_layout.addWidget(output_group)
         
         # 批量航班选项卡
         batch_flight_tab = QWidget()
         batch_layout = QVBoxLayout(batch_flight_tab)
+        batch_layout.setSpacing(15)
+        batch_layout.setContentsMargins(15, 15, 15, 15)
         
         batch_group = QGroupBox("批量生成设置")
         batch_grid = QGridLayout(batch_group)
+        batch_grid.setVerticalSpacing(10)
+        batch_grid.setHorizontalSpacing(15)
         
         batch_grid.addWidget(QLabel("机组数量:"), 0, 0)
         self.batch_count = QSpinBox()
@@ -145,92 +258,111 @@ class FlightPlanGenerator(QMainWindow):
         
         batch_grid.addWidget(QLabel("控制权所有席位:"), 1, 0)
         self.batch_ini = QLineEdit()
+        self.batch_ini.setPlaceholderText("请输入控制权席位...")
         batch_grid.addWidget(self.batch_ini, 1, 1)
         
         batch_layout.addWidget(batch_group)
         
+        batch_button_group = QGroupBox("操作")
+        batch_button_layout = QHBoxLayout(batch_button_group)
         self.batch_generate_btn = QPushButton("批量生成")
         self.batch_generate_btn.clicked.connect(self.generate_batch_flights)
-        batch_layout.addWidget(self.batch_generate_btn)
+        self.batch_generate_btn.setStyleSheet("QPushButton { background-color: #27ae60; } QPushButton:hover { background-color: #219653; }")
+        batch_button_layout.addWidget(self.batch_generate_btn)
+        batch_layout.addWidget(batch_button_group)
         
+        batch_output_group = QGroupBox("批量输出")
+        batch_output_layout = QVBoxLayout(batch_output_group)
         self.batch_output = QTextEdit()
-        batch_layout.addWidget(QLabel("批量输出:"))
-        batch_layout.addWidget(self.batch_output)
+        self.batch_output.setMinimumHeight(300)
+        batch_output_layout.addWidget(self.batch_output)
+        batch_layout.addWidget(batch_output_group)
         
-        #塔台选项卡
-        
+        # 塔台选项卡
         # 控制权设置
         control_grooup = QGroupBox("控制权设置")
         control_layout = QHBoxLayout(control_grooup)
         control_layout.addWidget(QLabel("控制权所有席位:"))
-        self.ini_input = QLineEdit()
-        control_layout.addWidget(self.ini_input)
+        self.tower_ini_input = QLineEdit()
+        self.tower_ini_input.setPlaceholderText("请输入控制权席位...")
+        control_layout.addWidget(self.tower_ini_input)
         tower_layout.addWidget(control_grooup)
         
         # 航班信息
         flight_grooup = QGroupBox("航班信息")
         flight_layout = QGridLayout(flight_grooup)
+        flight_layout.setVerticalSpacing(10)
+        flight_layout.setHorizontalSpacing(15)
         
         flight_layout.addWidget(QLabel("DEP机场:"), 0, 0)
-        self.dep_input = QComboBox()
-        self.dep_input.setEditable(True)
-        flight_layout.addWidget(self.dep_input, 0, 1)
+        self.tower_dep_input = QComboBox()
+        self.tower_dep_input.setEditable(True)
+        self.tower_dep_input.addItems(self.airports)
+        flight_layout.addWidget(self.tower_dep_input, 0, 1)
         
         flight_layout.addWidget(QLabel("ARR机场:"), 1, 0)
-        self.arr_input = QComboBox()
-        self.arr_input.setEditable(True)
-        flight_layout.addWidget(self.arr_input, 1, 1)
+        self.tower_arr_input = QComboBox()
+        self.tower_arr_input.setEditable(True)
+        self.tower_arr_input.addItems(self.airports)
+        flight_layout.addWidget(self.tower_arr_input, 1, 1)
         
         flight_layout.addWidget(QLabel("巡航高度:"), 2, 0)
-        self.rfl_input = QComboBox()
-        self.rfl_input.addItems(["29100", "30100", "31100", "32100", "33100", "34100", 
+        self.tower_rfl_input = QComboBox()
+        self.tower_rfl_input.addItems(["29100", "30100", "31100", "32100", "33100", "34100", 
                                 "35100", "36100", "37100", "38100", "39100", "40100", "41100"])
-        flight_layout.addWidget(self.rfl_input, 2, 1)
+        flight_layout.addWidget(self.tower_rfl_input, 2, 1)
         
         flight_layout.addWidget(QLabel("机场标高高度:"), 3, 0)
-        self.alti_input = QComboBox()
-        self.alti_input.addItems(list(self.ALTI.keys()))
-        flight_layout.addWidget(self.alti_input, 3, 1)
+        self.tower_alti_input = QComboBox()
+        self.tower_alti_input.addItems(list(self.ALTI.keys()))
+        flight_layout.addWidget(self.tower_alti_input, 3, 1)
         
         flight_layout.addWidget(QLabel("机型:"), 4, 0)
-        self.typ_input = QLineEdit("A320")
-        flight_layout.addWidget(self.typ_input, 4, 1)
+        self.tower_typ_input = QLineEdit("A320")
+        flight_layout.addWidget(self.tower_typ_input, 4, 1)
         
         flight_layout.addWidget(QLabel("机位:"), 5, 0)
         self.gate_input = QLineEdit("")
+        self.gate_input.setPlaceholderText("请输入登机口...")
         flight_layout.addWidget(self.gate_input, 5, 1)
         
         flight_layout.addWidget(QLabel("实际航路:"), 6, 0)
-        self.rte_input = QLineEdit()
-        flight_layout.addWidget(self.rte_input, 6, 1)
+        self.tower_rte_input = QLineEdit()
+        self.tower_rte_input.setPlaceholderText("留空则使用数据库航路")
+        flight_layout.addWidget(self.tower_rte_input, 6, 1)
         
         tower_layout.addWidget(flight_grooup)
         
         # 按钮
-        button_layout = QHBoxLayout()
-        self.generate_btn = QPushButton("生成飞行计划")
-        self.generate_btn.clicked.connect(self.generate_tower_flights)
-        button_layout.addWidget(self.generate_btn)
+        tower_button_group = QGroupBox("操作")
+        tower_button_layout = QHBoxLayout(tower_button_group)
+        self.tower_generate_btn = QPushButton("生成飞行计划")
+        self.tower_generate_btn.clicked.connect(self.generate_tower_flights)
+        self.tower_generate_btn.setStyleSheet("QPushButton { background-color: #27ae60; } QPushButton:hover { background-color: #219653; }")
+        tower_button_layout.addWidget(self.tower_generate_btn)
         
-        self.save_btn = QPushButton("保存到文件")
-        self.save_btn.clicked.connect(self.save_to_file)
-        button_layout.addWidget(self.save_btn)
+        self.tower_save_btn = QPushButton("保存到文件")
+        self.tower_save_btn.clicked.connect(self.save_to_file)
+        self.tower_save_btn.setStyleSheet("QPushButton { background-color: #e67e22; } QPushButton:hover { background-color: #d35400; }")
+        tower_button_layout.addWidget(self.tower_save_btn)
         
-        tower_layout.addLayout(button_layout)
+        tower_layout.addWidget(tower_button_group)
         
         # 输出区域
+        tower_output_group = QGroupBox("输出")
+        tower_output_layout = QVBoxLayout(tower_output_group)
         self.tower_output = QTextEdit()
-        tower_layout.addWidget(QLabel("输出:"))
-        tower_layout.addWidget(self.tower_output)
+        self.tower_output.setMinimumHeight(200)
+        tower_output_layout.addWidget(self.tower_output)
+        tower_layout.addWidget(tower_output_group)
         
         # 添加选项卡
-        tabs.addTab(single_flight_tab, "单个航班")
-        tabs.addTab(batch_flight_tab, "批量生成")
-        tabs.addTab(tower_flight_tab,"塔台设置")
+        tabs.addTab(single_flight_tab, "📝 单个航班")
+        tabs.addTab(batch_flight_tab, "📊 批量生成")
+        tabs.addTab(tower_flight_tab, "🏢 塔台设置")
         
-        # 初始化机场列表
-        self.dep_input.addItems(self.airports)
-        self.arr_input.addItems(self.airports)
+        # 状态栏
+        self.statusBar().showMessage("就绪 - 模拟机文本生成器已启动")
         
     def find_route_by_dep_arr(self, dep_code, arr_code):
         try:
@@ -292,7 +424,7 @@ class FlightPlanGenerator(QMainWindow):
         """
         # 如果参数为空，从界面获取
         if adep is None:
-            adep = self.dep_input.currentText().strip()
+            adep = self.tower_dep_input.currentText().strip()
         if gate is None:
             gate = self.gate_input.text().strip()
 
@@ -340,10 +472,9 @@ class FlightPlanGenerator(QMainWindow):
             return None
    
 
-
     def write_pos_and_hdg_into_json(self, pos, hdg):
         """将位置和航向写入JSON文件"""
-        adep = self.dep_input.currentText().strip()
+        adep = self.tower_dep_input.currentText().strip()
         gate = self.gate_input.text().strip()
 
         # 验证输入
@@ -386,7 +517,6 @@ class FlightPlanGenerator(QMainWindow):
         except Exception as e:
             print(f"写入数据时出错: {e}")
             return False
-            
             
     def generate_single_flight(self):
         # 获取输入值
@@ -438,6 +568,7 @@ class FlightPlanGenerator(QMainWindow):
         output += f"\n"
         
         self.output_text.setPlainText(output)
+        self.statusBar().showMessage("单个航班计划生成完成")
         
     def generate_batch_flights(self):
         flights = self.batch_count.value()
@@ -479,42 +610,43 @@ class FlightPlanGenerator(QMainWindow):
             output += f"INITIALPSEUDOPILOT:{ini}\n"
             output += f"\n"
         
-        self.tower_output.setPlainText(output)
+        self.batch_output.setPlainText(output)
+        self.statusBar().showMessage(f"批量生成完成 - 共生成 {flights} 个航班计划")
     
     def generate_tower_flights(self):
         airline = random.choice(self.airlines)
         numbers = str(random.randint(100,9999))
         callsign = airline + numbers
-        adep = self.dep_input.currentText()
-        dest = self.arr_input.currentText()
-        rfl = self.rfl_input.currentText()
-        alti_key = self.alti_input.currentText()
+        adep = self.tower_dep_input.currentText()
+        dest = self.tower_arr_input.currentText()
+        rfl = self.tower_rfl_input.currentText()
+        alti_key = self.tower_alti_input.currentText()
         alt = self.ALTI[alti_key]
-        typ = self.typ_input.text()
-        gate=self.gate_input.text()
+        typ = self.tower_typ_input.text()
+        gate = self.gate_input.text()
         result = self.find_pos_and_hdg_by_gate(adep, gate)
         if result:
                 pos, hdg = result
-                
-                
         else:
-                reply=QMessageBox.question(self,"未找到登机口数据",f"未找到{adep}的{gate}数据，是否手动输入？",
+                reply = QMessageBox.question(self, "未找到登机口数据", f"未找到{adep}的{gate}数据，是否手动输入？",
                                            QMessageBox.Yes | QMessageBox.No)
-                if reply==QMessageBox.Yes:
-                    pos,ok=QInputDialog.getText(self,"手动输入登机口数据","请输入经纬度")
-                    hdg,ok=QInputDialog.getText(self,"手动输入登机口数据","请输入头朝向")
-                    self.write_pos_and_hdg_into_json(pos,hdg)
+                if reply == QMessageBox.Yes:
+                    pos, ok = QInputDialog.getText(self, "手动输入登机口数据", "请输入经纬度:")
+                    if not ok or not pos:
+                        return
+                    hdg, ok = QInputDialog.getInt(self, "手动输入登机口数据", "请输入头朝向:", 0, 0, 360, 1)
                     if not ok:
                         return
+                    self.write_pos_and_hdg_into_json(pos, str(hdg))
                 else:
                     return
-        pos=pos.replace(",",":")
-        hdg=str(int(hdg)*2.88*4+2)
+        pos = pos.replace(",", ":")
+        hdg = str(int(hdg) * 2.88 * 4 + 2)
         if self.Cruise[str(rfl)]%2==0:
             EO="SE"
         else:
             EO="SO"
-        Name=str(adep)+"-"+str(dest)
+        Name = str(adep)+"-"+str(dest)
         
         # 查找航路
         route, found = self.find_route_by_dep_arr(adep, dest)
@@ -531,7 +663,7 @@ class FlightPlanGenerator(QMainWindow):
             else:
                 return
         remark = self.find_remarks_by_dep_arr(adep, dest)
-        rte = self.rte_input.text() or route
+        rte = self.tower_rte_input.text() or route
         
         # 生成输出
         output = f"PSEUDOPILOT:ALL\n"
@@ -540,10 +672,11 @@ class FlightPlanGenerator(QMainWindow):
         output += f"$ROUTE:{rte}\n"
         output += f"DELAY:1:8\n"
         output += f"REQALT::{alt}\n"
-        output += f"INITIALPSEUDOPILOT:{self.ini_input.text()}\n"
+        output += f"INITIALPSEUDOPILOT:{self.tower_ini_input.text()}\n"
         output += f"\n"
         
         self.tower_output.setPlainText(output)
+        self.statusBar().showMessage("塔台航班计划生成完成")
         
     def save_to_file(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "保存文件", "", "文本文件 (*.txt)")
@@ -552,11 +685,18 @@ class FlightPlanGenerator(QMainWindow):
                 with open(file_path, 'a', encoding='utf-8') as file:
                     file.write(self.output_text.toPlainText())
                 QMessageBox.information(self, "成功", "文件已保存")
+                self.statusBar().showMessage(f"文件已保存至: {file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"保存文件时出错: {e}")
+                self.statusBar().showMessage("文件保存失败")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    
+    # 设置应用字体
+    font = QFont("Microsoft YaHei", 9)
+    app.setFont(font)
+    
     window = FlightPlanGenerator()
     window.show()
     sys.exit(app.exec_())
