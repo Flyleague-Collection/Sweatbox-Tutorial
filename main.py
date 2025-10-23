@@ -443,7 +443,7 @@ class FlightPlanGenerator(QMainWindow):
         
         app_flight_layout.addWidget(QLabel("进/离场程序:"),5,0)
         self.app_star_input=QLineEdit("")
-        self.app_star_input.setPlaceholderText("目前未开发完成，请按照实际航路格式输入")
+        self.app_star_input.setPlaceholderText("")
         app_flight_layout.addWidget(self.app_star_input,5,1)
         
         app_flight_layout.addWidget(QLabel("经纬度:"),6,0)
