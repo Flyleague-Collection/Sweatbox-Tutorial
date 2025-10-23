@@ -33,7 +33,8 @@ class FlightPlanGenerator(QMainWindow):
         
         
         
-        self.csv_path = "adf/RouteCheck.csv"
+        self.route_path = "adf/RouteCheck.csv"
+        self.sid_path="adf/STARSID.csv"
         self.gate_path="adf/Gate.json"
         
         # 然后初始化UI
@@ -115,6 +116,8 @@ class FlightPlanGenerator(QMainWindow):
         main_layout.setContentsMargins(15, 15, 15, 15)
         
         # 创建标题
+       # 创建标题和置顶按钮
+        title_layout = QHBoxLayout()
         title_label = QLabel("模拟机文本生成器")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
@@ -128,7 +131,37 @@ class FlightPlanGenerator(QMainWindow):
                 border-radius: 5px;
             }
         """)
-        main_layout.addWidget(title_label)
+
+        # 创建置顶按钮
+        self.topmost_button = QPushButton("置顶")
+        self.topmost_button.setCheckable(True)
+        self.topmost_button.setFixedSize(60, 40)
+        self.topmost_button.setStyleSheet("""
+            QPushButton {
+                background-color: #95a5a6;
+                border: none;
+                color: white;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #e74c3c;
+            }
+            QPushButton:hover {
+                background-color: #7f8c8d;
+            }
+            QPushButton:checked:hover {
+                background-color: #c0392b;
+            }
+        """)
+        self.topmost_button.clicked.connect(self.toggle_topmost)
+
+        # 添加到布局
+        title_layout.addWidget(title_label)
+        title_layout.addWidget(self.topmost_button)
+
+        main_layout.addLayout(title_layout)
         
         # 创建选项卡
         tabs = QTabWidget()
@@ -466,7 +499,7 @@ class FlightPlanGenerator(QMainWindow):
         
     def find_route_by_dep_arr(self, dep_code, arr_code):
         try:
-            df = pd.read_csv(self.csv_path)
+            df = pd.read_csv(self.route_path)
             
             if not all(col in df.columns for col in ['Dep', 'Arr', 'Route']):
                 raise ValueError("CSV文件必须包含Dep, Arr和Route列")
@@ -494,7 +527,7 @@ class FlightPlanGenerator(QMainWindow):
             
     def find_remarks_by_dep_arr(self, dep_code, arr_code):
         try:
-            df = pd.read_csv(self.csv_path)
+            df = pd.read_csv(self.route_path)
             
             if not all(col in df.columns for col in ['Dep', 'Arr', 'Remarks']):
                 raise ValueError("CSV文件必须包含Dep, Arr和Remarks列")
@@ -647,7 +680,7 @@ class FlightPlanGenerator(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
                 route, ok = QInputDialog.getText(self, "手动输入航路", "请输入航路:")
-                with open(self.csv_path,"a",encoding='utf-8') as file:
+                with open(self.route_path,"a",encoding='utf-8') as file:
                     file.write('{},{},{},{},,,{},\n'.format(adep,dest,Name,EO,route))
                 if not ok or not route:
                     return
@@ -756,7 +789,7 @@ class FlightPlanGenerator(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
                 route, ok = QInputDialog.getText(self, "手动输入航路", "请输入航路:")
-                with open(self.csv_path,"a",encoding='utf-8') as file:
+                with open(self.route_path,"a",encoding='utf-8') as file:
                     file.write('{},{},{},{},,,{},\n'.format(adep,dest,Name,EO,route))
                 if not ok or not route:
                     return
@@ -779,7 +812,40 @@ class FlightPlanGenerator(QMainWindow):
         self.statusBar().showMessage("塔台航班计划生成完成")
         
     
-    #def find_star_and_sid(self):
+    def get_rte_options(self, pro_input: str) -> str:
+        try:
+            rte_values = set()
+
+            with open(self.sid_path, 'r', encoding='utf-8') as file:
+                for i, line in enumerate(file):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    fields = line.split(',')
+
+                    # 第一行是表头
+                    if i == 0:
+                        if 'PRO' in fields and 'RTE' in fields:
+                            pro_index = fields.index('PRO')
+                            rte_index = fields.index('RTE')
+                        else:
+                            return ""
+                        continue
+                    
+                    # 数据行：只取前5个字段，忽略多余的
+                    if len(fields) >= 5:
+                        pro_value = fields[pro_index] if pro_index < len(fields) else ""
+                        rte_value = fields[rte_index] if rte_index < len(fields) else ""
+
+                        if pro_input in pro_value and rte_value:
+                            rte_values.add(rte_value)
+
+            return ','.join(rte_values) if rte_values else ""
+
+        except Exception as e:
+            print(f"读取文件出错: {e}")
+            return ""
     
     
     def generate_app_flights(self):
@@ -796,7 +862,7 @@ class FlightPlanGenerator(QMainWindow):
         pos = pos.replace(",", ":")
         hdg=self.app_head_input.text()
         hdg = str(int(hdg) * 2.88 * 4 + 2)
-        star=self.app_star_input.text()
+        star_input=self.app_star_input.text()
         if self.Cruise[str(rfl)]%2==0:
             EO="SE"
         else:
@@ -809,26 +875,40 @@ class FlightPlanGenerator(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
                 route, ok = QInputDialog.getText(self, "手动输入航路", "请输入航路:")
-                with open(self.csv_path,"a",encoding='utf-8') as file:
+                with open(self.route_path,"a",encoding='utf-8') as file:
                     file.write('{},{},{},{},,,{},\n'.format(adep,dest,Name,EO,route))
                 if not ok or not route:
                     return
             else:
                 return
+            
+        star=self.get_rte_options(star_input)
+        if not star:
+            reply=QMessageBox.question(self,"未找到程序航路",
+                                       f"未找到{star_input}程序，是否手动输入航路?",
+                                       QMessageBox.Yes | QMessageBox.No)
+            if reply==QMessageBox.Yes:
+                star,ok=QInputDialog.getText(self,"手动输入航路","请输入航路")
+                with open(self.sid_path,"a",encoding='utf-8') as file:
+                    file.write('\n,{},,{},{},'.format(adep,star_input,star))
+                if not ok or not star:
+                    return
+            else:
+                return
+            
         remark = self.find_remarks_by_dep_arr(adep, dest)
-        rte = self.app_star_input.text() or route
         # 生成输出
         output = f"PSEUDOPILOT:ALL\n"
         output += f"@N:{callsign}:2000:1:{pos}:{alt}:0:{hdg}:0\n"
         output += f"$FP{callsign}:*A:I:{typ}:420:{adep}:0000:0000:{rfl}:{dest}:00:00:0:0::/v/{remark}:{route}\n"
-        output += f"$ROUTE:{rte}\n"
+        output += f"$ROUTE:{star}\n"
         output += f"DELAY:1:8\n"
         output += f"REQALT::{alt}\n"
         output += f"INITIALPSEUDOPILOT:{self.app_ini_input.text()}\n"
         output += f"\n"
         
         self.app_output.setPlainText(output)
-        self.statusBar().showMessage("塔台航班计划生成完成")
+        self.statusBar().showMessage("进近航班计划生成完成")
         
         
         
@@ -843,6 +923,45 @@ class FlightPlanGenerator(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"保存文件时出错: {e}")
                 self.statusBar().showMessage("文件保存失败")
+    def toggle_topmost(self, checked):
+        """切换窗口置顶状态"""
+        if checked:
+            # 开启置顶
+            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+            self.topmost_button.setText("取消置顶")
+            self.topmost_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c;
+                    border: none;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #c0392b;
+                }
+            """)
+        else:
+            # 关闭置顶
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
+            self.topmost_button.setText("置顶")
+            self.topmost_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #95a5a6;
+                    border: none;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #7f8c8d;
+                }
+            """)
+        
+        # 重新显示窗口以使设置生效
+        self.show()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
