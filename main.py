@@ -4,6 +4,8 @@ import re
 import pandas as pd
 import random
 import os
+import numpy as np
+from collections import Counter
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                              QTextEdit, QSpinBox, QComboBox, QMessageBox, 
@@ -352,8 +354,7 @@ class FlightPlanGenerator(QMainWindow):
         flight_layout.addWidget(self.tower_rfl_input, 2, 1)
         
         flight_layout.addWidget(QLabel("机场标高高度:"), 3, 0)
-        self.tower_alti_input = QComboBox()
-        self.tower_alti_input.addItems(list(self.ALTI.keys()))
+        self.tower_alti_input= QLineEdit()
         flight_layout.addWidget(self.tower_alti_input, 3, 1)
         
         flight_layout.addWidget(QLabel("机型:"), 4, 0)
@@ -641,7 +642,7 @@ class FlightPlanGenerator(QMainWindow):
                 data[adep] = {gate: gate_data}
 
             # 写回文件
-            with open("Gate.json", "w", encoding="utf-8") as f:
+            with open(self.gate_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
 
             print(f"成功写入数据: {adep}/{gate} - 位置: {pos}, 航向: {hdg}")
@@ -753,8 +754,7 @@ class FlightPlanGenerator(QMainWindow):
         adep = self.tower_dep_input.currentText()
         dest = self.tower_arr_input.currentText()
         rfl = self.tower_rfl_input.currentText()
-        alti_key = self.tower_alti_input.currentText()
-        alt = self.ALTI[alti_key]
+        alt = self.tower_alti_input.text()
         typ = self.tower_typ_input.text()
         gate = self.gate_input.text()
         result = self.find_pos_and_hdg_by_gate(adep, gate)
@@ -799,31 +799,36 @@ class FlightPlanGenerator(QMainWindow):
         rte = self.tower_rte_input.text() or route
         
         # 生成输出
-        output = f"PSEUDOPILOT:ALL\n"
-        output += f"@N:{callsign}:2000:1:{pos}:{alt}:0:{hdg}:0\n"
-        output += f"$FP{callsign}:*A:I:{typ}:420:{adep}:0000:0000:{rfl}:{dest}:00:00:0:0::/v/{remark}:{route}\n"
-        output += f"$ROUTE:{rte}\n"
-        output += f"DELAY:1:8\n"
-        output += f"REQALT::{alt}\n"
-        output += f"INITIALPSEUDOPILOT:{self.tower_ini_input.text()}\n"
-        output += f"\n"
+        tower_output = f"PSEUDOPILOT:ALL\n"
+        tower_output += f"@N:{callsign}:2000:1:{pos}:{alt}:0:{hdg}:0\n"
+        tower_output += f"$FP{callsign}:*A:I:{typ}:420:{adep}:0000:0000:{rfl}:{dest}:00:00:0:0::/v/{remark}:{route}\n"
+        tower_output += f"$ROUTE:{rte}\n"
+        tower_output += f"DELAY:1:8\n"
+        tower_output += f"REQALT::{alt}\n"
+        tower_output += f"INITIALPSEUDOPILOT:{self.tower_ini_input.text()}\n"
+        tower_output += f"\n"
         
-        self.tower_output.setPlainText(output)
+        self.tower_output.setPlainText(tower_output)
+        self.output_text.setPlainText(tower_output)
         self.statusBar().showMessage("塔台航班计划生成完成")
         
     
     def get_rte_options(self, pro_input: str) -> str:
+        """
+        根据PRO输入从CSV文件中获取所有包含该PRO的行对应的RTE选项的重合部分
+        使用最简单的版本，手动处理CSV格式问题
+        """
         try:
-            rte_values = set()
-
+            rte_values = []
+            
             with open(self.sid_path, 'r', encoding='utf-8') as file:
                 for i, line in enumerate(file):
                     line = line.strip()
                     if not line:
                         continue
-
+                        
                     fields = line.split(',')
-
+                    
                     # 第一行是表头
                     if i == 0:
                         if 'PRO' in fields and 'RTE' in fields:
@@ -837,16 +842,36 @@ class FlightPlanGenerator(QMainWindow):
                     if len(fields) >= 5:
                         pro_value = fields[pro_index] if pro_index < len(fields) else ""
                         rte_value = fields[rte_index] if rte_index < len(fields) else ""
-
-                        if pro_input in pro_value and rte_value:
-                            rte_values.add(rte_value)
-
-            return ','.join(rte_values) if rte_values else ""
-
+                        
+                        # 检查PRO是否包含输入值且RTE不为空
+                        if pro_input in pro_value and rte_value and rte_value.strip():
+                            rte_values.append(rte_value.strip())
+            
+            if not rte_values:
+                return ""
+            
+            # 计算所有RTE值的交集（共同部分）
+            # 这里我们找出所有匹配行中都出现的RTE值
+            from collections import Counter
+            rte_counter = Counter(rte_values)
+            
+            # 获取出现次数等于总匹配行数的RTE值（即所有行都有的共同值）
+            total_matches = len(rte_values)
+            common_rte = [rte for rte, count in rte_counter.items() if count == total_matches]
+            
+            # 如果没有完全相同的共同值，返回所有去重后的值
+            if not common_rte:
+                # 或者可以返回出现次数最多的值
+                # common_rte = [rte_counter.most_common(1)[0][0]] if rte_counter else []
+                
+                # 或者返回所有去重值
+                common_rte = list(set(rte_values))
+            
+            return ','.join(common_rte) if common_rte else ""
+            
         except Exception as e:
             print(f"读取文件出错: {e}")
             return ""
-    
     
     def generate_app_flights(self):
         airline = random.choice(self.airlines)
@@ -959,7 +984,7 @@ class FlightPlanGenerator(QMainWindow):
                     background-color: #7f8c8d;
                 }
             """)
-        
+
         # 重新显示窗口以使设置生效
         self.show()
 
