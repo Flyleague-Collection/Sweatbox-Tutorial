@@ -162,3 +162,66 @@ def convert_to_dot_dms_format(decimal_value, prefix=''):
     except Exception as e:
         print(f"转换为点分隔度分秒格式时出错: {e}")
         return None
+    
+def convert_runway(runway_str):
+    """
+    转换跑道编号
+    规则：
+    1. 将前面的数字修改为与原有数字相差18
+    2. 数字必须大于0且小于等于36
+    3. 若转换后数字<10，需要表示为06、07等格式（两位数）
+    4. 将L转为R，R转为L，C保持不变
+    """
+    # 分离数字部分和字母部分
+    runway_str = str(runway_str).strip()
+    # 提取数字部分（可能有多位数字）
+    num_part = ''
+    letter_part = ''
+    for i, char in enumerate(runway_str):
+        if char.isdigit():
+            num_part += char
+        else:
+            letter_part = runway_str[i:]
+            break
+        
+    if not num_part:
+        return "输入格式错误：未找到数字部分"
+    try:
+        original_num = int(num_part)
+    except ValueError:
+        return "输入格式错误：数字部分无效"
+    # 确保原始数字在有效范围内
+    if original_num <= 0 or original_num > 36:
+        return f"输入错误：跑道数字{original_num}不在1-36范围内"
+    # 计算新的跑道数字（相差18）
+    new_num = original_num - 18
+    # 处理数字小于18的情况（考虑跑道数字的循环特性）
+    if new_num <= 0:
+        new_num += 36
+    # 确保新数字在1-36范围内
+    if new_num < 1 or new_num > 36:
+        return f"计算错误：新跑道数字{new_num}超出范围"
+    # 格式化为两位数（如06、07）
+    new_num_str = f"{new_num:02d}"
+    # 处理字母部分
+    new_letter_part = ''
+    for char in letter_part:
+        if char.upper() == 'L':
+            new_letter_part += 'R'
+        elif char.upper() == 'R':
+            new_letter_part += 'L'
+        elif char.upper() == 'C':
+            new_letter_part += 'C'
+        else:
+            # 保留其他字符（如果有的话）
+            new_letter_part += char
+    return new_num_str + new_letter_part
+
+def batch_convert(runway_list):
+    """
+    批量转换跑道编号
+    """
+    results = []
+    for runway in runway_list:
+        results.append(convert_runway(runway))
+    return results
