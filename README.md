@@ -1,3 +1,5 @@
+# Sweatbox-Tutorial
+
 此仓库主要用于存储使用EuroScope创作模拟机文本的教程。
 将提供模拟机文本（Sweatbox）从撰写的完整教程。
 
